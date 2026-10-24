@@ -6,8 +6,10 @@ MaiBot 第三方插件：把**小米 MiMo**（OpenAI 兼容接口）接入为 `m
 
 ## 兼容性
 
-- MaiBot **1.1.x / 1.2.x**：Provider 请求为 `message_list`，插件按旧协议解析并返回 `content` / `tool_calls`。
-- MaiBot **1.3.15+**：Provider 请求为 `context_items`，插件会先把 Context Item 投影为 OpenAI messages，并在返回时附带原生 `output_items`（`item_schema_version=1`），不再走旧版兼容入口。
+- MaiBot **1.1.0 ~ 1.3.99**（`host_application` 声明区间；实测 1.1.4、1.3.15）：
+  - **1.1.x / 1.2.x**：Provider 请求为 `message_list`，插件按旧协议解析并返回 `content` / `tool_calls`。
+  - **1.3.x（实测 1.3.15）**：Provider 请求为 `context_items`，插件会先把 Context Item 投影为 OpenAI messages，并在返回时附带原生 `output_items`（`item_schema_version=1`），不再走旧版兼容入口。
+- 1.4+ 尚未验证，不在声明的兼容区间内；确认可用后再放宽 `max_version`。
 - SDK：`2.0.0` ~ `2.99.99`（已在 2.7.1 与 2.16.0 上验证）。
 - 未实现 `embedding` / `audio_transcription`，这两类请求会抛 `NotImplementedError`，请交给其他 Provider。
 
