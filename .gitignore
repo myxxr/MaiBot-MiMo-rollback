@@ -1,0 +1,7 @@
+# 运行时配置由 Runner 根据 config_model 生成，不入库
+/config.toml
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
