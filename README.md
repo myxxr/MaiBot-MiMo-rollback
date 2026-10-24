@@ -48,7 +48,7 @@ The request was rejected because it was considered high risk
   ```powershell
   Copy-Item -Recurse -Force "<插件目录>" "C:\...\MaiBot-1.1.4\plugins\maibot-mimo-rollback"
   ```
-- 或解压发布包 `maibot-mimo-rollback-1.0.1.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
+- 或解压发布包 `maibot-mimo-rollback-v1.0.1.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
 
 然后重启 MaiBot（或在 WebUI 插件管理中启用/重载）。插件首次加载后会生成 `config.toml`。
 
@@ -145,4 +145,4 @@ considered high risk
 自测脚本会检查：清单与 `@LLMProvider` 声明一致、两种请求协议的转换、工具/响应格式转换、
 风险关键词识别、三种策略行为，以及用 `httpx.MockTransport` 模拟 MiMo 接口跑通完整 `get_response`。
 
-> 发布包 `maibot-mimo-rollback-1.0.1.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。
+> 发布包 `maibot-mimo-rollback-v1.0.1.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。
