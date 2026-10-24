@@ -29,8 +29,16 @@ The request was rejected because it was considered high risk
   - `raise`（默认）：抛错 → 主程序重试当前模型，失败后切换任务里的下一个模型；
   - `replace`：把命中文本替换为可配置的安全文案后继续回复；
   - `ignore`：保持旧行为（仅用于排查）。
-- `/mimo_status` 命令：查看当前策略、已处理响应数、风险命中次数。
+- `/mimo_status` 命令：查看当前策略、已处理响应数、风险命中次数。**受保护命令（`permission="operator"`）**，MaiBot 1.3.15+ 下仅管理员可用。
 - 鉴权取自模型配置里的 `api_providers`（`api_key` / `base_url` / `auth_type` 等），插件不硬编码密钥；未配置时可用环境变量 `MIMO_API_KEY` 兜底。
+
+## 命令权限
+
+`/mimo_status` 在代码里声明为 `permission="operator"`：
+
+- **MaiBot 1.3.15+**：在 WebUI「bot 配置 → 命令权限」里能看到它标记为「受保护」。需要在同一页面把执行人加入「全局管理员」（格式 `平台:用户ID`，例如 `qq:123456789`），或用「仅为此命令放行用户 / 放行聊天」单独放行；没有权限的用户执行会收到提示（可勾选「不显示无权限提示」改为静默拦截）。
+- **MaiBot 1.1.x / 1.2.x**：宿主没有命令权限机制，`permission` 元数据会被忽略，命令仍是公开的；如需限制，只建议在可信环境中部署。
+
 
 ## 安装
 
@@ -40,7 +48,7 @@ The request was rejected because it was considered high risk
   ```powershell
   Copy-Item -Recurse -Force "<插件目录>" "C:\...\MaiBot-1.1.4\plugins\maibot-mimo-rollback"
   ```
-- 或解压发布包 `maibot-mimo-rollback-1.0.0.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
+- 或解压发布包 `maibot-mimo-rollback-1.0.1.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
 
 然后重启 MaiBot（或在 WebUI 插件管理中启用/重载）。插件首次加载后会生成 `config.toml`。
 
@@ -137,4 +145,4 @@ considered high risk
 自测脚本会检查：清单与 `@LLMProvider` 声明一致、两种请求协议的转换、工具/响应格式转换、
 风险关键词识别、三种策略行为，以及用 `httpx.MockTransport` 模拟 MiMo 接口跑通完整 `get_response`。
 
-> 发布包 `maibot-mimo-rollback-1.0.0.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。
+> 发布包 `maibot-mimo-rollback-1.0.1.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。

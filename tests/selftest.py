@@ -115,6 +115,13 @@ def test_manifest(module) -> None:
 
     check("插件类声明了 config_model", module.MiMoProviderPlugin.config_model is module.MiMoPluginConfig)
 
+    components = instance.get_components()
+    command_components = [component for component in components if component.get("name") == "mimo_status"]
+    check("收集到 mimo_status 命令", len(command_components) == 1, str(components))
+    if command_components:
+        metadata = command_components[0].get("metadata") or {}
+        check("命令声明为受保护权限 permission=operator", metadata.get("permission") == "operator", str(metadata))
+
 
 def test_config_defaults(module) -> None:
     """校验配置模型默认值。"""

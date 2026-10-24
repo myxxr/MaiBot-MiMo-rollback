@@ -971,9 +971,14 @@ class MiMoProviderPlugin(MaiBotPlugin):
 
     # ---- 组件 ----
 
-    @Command("mimo_status", description="查看 MaiBot-MiMo-rollback 的风险拦截统计", pattern=r"^/mimo_status$")
+    @Command(
+        "mimo_status",
+        description="查看 MaiBot-MiMo-rollback 的风险拦截统计",
+        pattern=r"^/mimo_status$",
+        permission="operator",
+    )
     async def mimo_status(self, stream_id: str = "", **kwargs: Any) -> Tuple[bool, str, int]:
-        """输出当前风险拦截统计。"""
+        """输出当前风险拦截统计（仅管理员）。"""
 
         del kwargs
         text = self._build_status_text()
