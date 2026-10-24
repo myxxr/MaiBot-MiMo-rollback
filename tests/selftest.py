@@ -77,7 +77,7 @@ def resolve_sdk_dir(override: str = "") -> Path:
 def load_plugin_module():
     """按文件路径导入 plugin.py。"""
 
-    spec = importlib.util.spec_from_file_location("mimo_safe_provider_under_test", PLUGIN_DIR / "plugin.py")
+    spec = importlib.util.spec_from_file_location("mimo_plugin_under_test", PLUGIN_DIR / "plugin.py")
     if spec is None or spec.loader is None:
         raise SystemExit("无法加载 plugin.py")
     module = importlib.util.module_from_spec(spec)
@@ -100,7 +100,7 @@ def test_manifest(module) -> None:
 
     manifest = json.loads((PLUGIN_DIR / "_manifest.json").read_text(encoding="utf-8"))
     check("manifest_version == 2", manifest.get("manifest_version") == 2)
-    check("id 合法", manifest.get("id") == "maibot-mimo-rollback")
+    check("id 合法", manifest.get("id") == "myxxr.mimo-rollback")
 
     providers = manifest.get("llm_providers") or []
     check("manifest 声明了 1 个 llm_provider", len(providers) == 1)
@@ -643,7 +643,7 @@ def test_provider_integration(module) -> None:
     check("embedding 请求明确抛出 NotImplementedError", asyncio.run(run_embedding()))
 
     plugin = make_plugin(module)
-    schema = plugin.build_config_schema(plugin_id="maibot-mimo-rollback")
+    schema = plugin.build_config_schema(plugin_id="myxxr.mimo-rollback")
     sections = schema.get("sections") or {}
     check("WebUI 配置 Schema 含 risk 分组", "risk" in sections, str(list(sections.keys())))
 

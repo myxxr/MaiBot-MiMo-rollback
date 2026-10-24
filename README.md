@@ -1,6 +1,6 @@
 # MaiBot-MiMo-rollback
 
-作者：myxxr ｜ 许可证：MIT
+作者：myxxr ｜ 许可证：MIT ｜ 插件 ID：`myxxr.mimo-rollback`
 
 MaiBot 第三方插件：把**小米 MiMo**（OpenAI 兼容接口）接入为 `mimo.provider` 这个 `client_type`，并在 Provider 层识别 MiMo 的「风险内容拦截」返回。
 
