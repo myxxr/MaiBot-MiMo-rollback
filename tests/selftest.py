@@ -101,6 +101,7 @@ def test_manifest(module) -> None:
     manifest = json.loads((PLUGIN_DIR / "_manifest.json").read_text(encoding="utf-8"))
     check("manifest_version == 2", manifest.get("manifest_version") == 2)
     check("id 合法", manifest.get("id") == "myxxr.mimo-rollback")
+    check("plugin_type == provider", manifest.get("plugin_type") == "provider")
 
     providers = manifest.get("llm_providers") or []
     check("manifest 声明了 1 个 llm_provider", len(providers) == 1)
@@ -655,6 +656,63 @@ def test_provider_integration(module) -> None:
     check("WebUI 配置 Schema 含 risk 分组", "risk" in sections, str(list(sections.keys())))
 
 
+def test_security(module) -> None:
+    """校验 base_url 校验、重定向拒绝与 query 鉴权告警。"""
+
+    check("https 官方地址无告警", module.inspect_base_url("https://api.xiaomimimo.com/v1") == [])
+
+    http_warnings = module.inspect_base_url("http://example.com/v1")
+    check("http 明文告警", any("http" in warning for warning in http_warnings), str(http_warnings))
+
+    metadata_warnings = module.inspect_base_url("http://169.254.169.254/latest")
+    check("云元数据地址告警", any("内网" in warning for warning in metadata_warnings), str(metadata_warnings))
+
+    loopback_warnings = module.inspect_base_url("https://127.0.0.1:8080/v1")
+    check("回环地址告警", any("内网" in warning for warning in loopback_warnings), str(loopback_warnings))
+
+    raised = False
+    try:
+        module.inspect_base_url("ftp://example.com/v1")
+    except module.MiMoProviderError:
+        raised = True
+    check("非 http(s) 协议被拒绝", raised)
+
+    plugin = make_plugin(module)
+    client = plugin._get_http_client()
+    check("HTTP 客户端关闭重定向", client.follow_redirects is False)
+    asyncio.run(client.aclose())
+    plugin._http_client = None
+
+    calls = {"count": 0}
+
+    async def run_redirect_request():
+        def handler(_request: httpx.Request) -> httpx.Response:
+            calls["count"] += 1
+            return httpx.Response(302, headers={"location": "https://evil.example.com/collect"})
+
+        plugin._http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            await plugin.handle_llm("response", _build_provider_request())
+        finally:
+            await plugin._http_client.aclose()
+            plugin._http_client = None
+
+    raised = False
+    try:
+        asyncio.run(run_redirect_request())
+    except module.MiMoProviderError as exc:
+        raised = "重定向" in str(exc)
+    check("重定向直接报错且不跟随", raised and calls["count"] == 1, f"raised={raised}, calls={calls['count']}")
+
+    plugin = make_plugin(module)
+    request = _build_provider_request()
+    request["api_provider"]["auth_type"] = "query"
+    _url, headers, params = plugin._build_http_target(request["api_provider"])
+    check("query 鉴权写入查询参数", params.get("api_key") == "sk-test-key", str(params))
+    check("query 鉴权不写 Authorization", "authorization" not in {key.lower() for key in headers}, str(headers))
+
+
+
 def load_host_context_modules(maibot_ref: str):
     """按文件路径加载宿主 1.3.15 的 Context Item 纯数据模块（无第三方依赖）。"""
 
@@ -764,6 +822,7 @@ def main() -> int:
     test_conversions(module)
     test_risk_strategies(module)
     test_provider_integration(module)
+    test_security(module)
     test_output_items_cross_version(module, args.maibot_ref)
 
     print(f"\n结果: {PASSED} 通过, {FAILED} 失败")

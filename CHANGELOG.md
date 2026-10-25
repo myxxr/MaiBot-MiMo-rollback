@@ -1,5 +1,13 @@
 # 更新日志
 
+## 1.0.2 - 2026-10-25
+
+- manifest 增加 `plugin_type: "provider"`。
+- 安全加固：
+  - HTTP 客户端不再跟随重定向，`3xx` 直接报错，避免附加 Header 与请求体（含聊天内容）被带到重定向目标；
+  - `base_url` / `base_url_override` 增加协议与主机校验：非 `http(s)` 直接报错，`http` 明文与内网/回环/云元数据地址输出告警；
+  - `auth_type=query` 首次使用时输出告警（key 会进入 URL 查询参数，可能被访问日志记录）。
+
 ## 1.0.1 - 2026-10-24
 
 - `/mimo_status` 改为受保护命令（`permission="operator"`）：MaiBot 1.3.15+ 下仅管理员/被放行的用户或聊天可执行。

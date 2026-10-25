@@ -50,7 +50,7 @@ The request was rejected because it was considered high risk
   ```powershell
   Copy-Item -Recurse -Force "<插件目录>" "C:\...\MaiBot-1.1.4\plugins\maibot-mimo-rollback"
   ```
-- 或解压发布包 `maibot-mimo-rollback-v1.0.1.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
+- 或解压发布包 `maibot-mimo-rollback-v1.0.2.zip`，把其中的 `maibot-mimo-rollback` 文件夹放进 `plugins/`。
 
 然后重启 MaiBot（或在 WebUI 插件管理中启用/重载）。插件首次加载后会生成 `config.toml`。
 
@@ -66,6 +66,14 @@ The request was rejected because it was considered high risk
 - `timeout`：建议 `60`
 
 对应模型条目的 `model_identifier` 填 MiMo 的真实模型名，例如 `mimo-v2.6-flash`、`mimo-v2.6-pro`。
+
+### 安全注意事项
+
+- **优先使用 `https` 与可信域名**。`base_url` 配成 `http://` 或内网/回环/链路本地地址（含 `169.254.169.254` 这类云元数据地址）时，`api_key` 与聊天内容会明文传输或发往非预期主机；插件会在首次使用时输出告警，但不会替你判断该地址是否可信。
+- **不要使用 `auth_type=query`**：它会把 `api_key` 放进 URL 查询参数，容易被代理、网关或访问日志记录下来；建议用 `bearer` 或 `header`。插件在该模式下会输出一次性告警。
+- **插件不跟随任何 HTTP 重定向**：遇到 `3xx` 会直接报错。这是为了避免重定向时 `Authorization` 被 httpx 剥掉、但附加 Header 与请求体（含聊天内容）仍被带到重定向目标。请把 `base_url` 直接配置为最终地址。
+- 不要把密钥写进 `base_url` 或 `request.extra_headers` 之外的任何配置文本。
+
 
 ## 回退模型放在哪里
 
@@ -147,4 +155,4 @@ considered high risk
 自测脚本会检查：清单与 `@LLMProvider` 声明一致、两种请求协议的转换、工具/响应格式转换、
 风险关键词识别、三种策略行为，以及用 `httpx.MockTransport` 模拟 MiMo 接口跑通完整 `get_response`。
 
-> 发布包 `maibot-mimo-rollback-v1.0.1.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。
+> 发布包 `maibot-mimo-rollback-v1.0.2.zip` 只包含运行所需文件（`_manifest.json`、`plugin.py`、`README.md`、`CHANGELOG.md`、`.gitignore`），不含 `tests/`，自测保留在仓库里。

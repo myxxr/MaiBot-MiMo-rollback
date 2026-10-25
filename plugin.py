@@ -25,9 +25,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import httpx
 
@@ -184,6 +186,54 @@ def _truncate(text: str, limit: int) -> str:
     if len(normalized) <= limit:
         return normalized
     return normalized[:limit] + "…"
+
+
+def _is_private_or_metadata_host(host: str) -> bool:
+    """判断主机是否为回环、内网、链路本地或云元数据地址。"""
+
+    normalized = str(host or "").strip().strip("[]").lower()
+    if not normalized:
+        return False
+    if normalized in {"localhost", "metadata.google.internal"}:
+        return True
+    if normalized.endswith((".local", ".internal")):
+        return True
+    try:
+        address = ipaddress.ip_address(normalized)
+    except ValueError:
+        return False
+    return (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_multicast
+    )
+
+
+def inspect_base_url(url: str) -> List[str]:
+    """校验 base_url 并返回安全提醒列表。
+
+    Raises:
+        MiMoProviderError: 当 URL 不是合法的 http(s) 地址时抛出。
+    """
+
+    raw_url = str(url or "").strip()
+    try:
+        parsed = urlparse(raw_url)
+        hostname = parsed.hostname
+    except ValueError as exc:
+        raise MiMoProviderError(f"base_url 无法解析: {raw_url!r}") from exc
+
+    if parsed.scheme.lower() not in {"http", "https"} or not hostname:
+        raise MiMoProviderError(f"base_url 必须是包含主机名的 http(s) 地址: {raw_url!r}")
+
+    warnings: List[str] = []
+    if parsed.scheme.lower() == "http":
+        warnings.append("base_url 使用 http 明文传输，api_key 与聊天内容可能被窃听")
+    if _is_private_or_metadata_host(hostname):
+        warnings.append(f"base_url 指向内网/回环/云元数据地址（{hostname}），请确认这是可信代理")
+    return warnings
 
 
 def detect_risk_hit(
@@ -770,6 +820,14 @@ class MiMoResponseProvider(LLMProviderBase):
         except httpx.HTTPError as exc:
             raise MiMoProviderError(f"MiMo 网络请求失败: {exc}") from exc
 
+        if 300 <= response.status_code < 400:
+            location = _truncate(str(response.headers.get("location") or ""), 200)
+            raise MiMoProviderError(
+                f"MiMo 接口返回重定向 HTTP {response.status_code}（Location: {location or '空'}）。"
+                "插件不跟随重定向，避免 api_key、附加 Header 与聊天内容被带到重定向目标；"
+                "请把 base_url 直接配置为最终地址。"
+            )
+
         if response.status_code >= 400:
             snippet = _truncate(response.text, 300)
             raise MiMoProviderError(f"MiMo 接口返回 HTTP {response.status_code}: {snippet}")
@@ -800,6 +858,8 @@ class MiMoProviderPlugin(MaiBotPlugin):
         self._total_responses = 0
         self._risk_hits = 0
         self._last_risk_reason = ""
+        self._warned_base_urls: set[str] = set()
+        self._warned_query_auth = False
 
     # ---- 生命周期 ----
 
@@ -892,10 +952,21 @@ class MiMoProviderPlugin(MaiBotPlugin):
                 return text
         return DEFAULT_BASE_URL
 
+    def _check_base_url(self, base_url: str) -> None:
+        """校验 base_url，并对不安全配置输出一次性告警。"""
+
+        warnings = inspect_base_url(base_url)
+        if not warnings or base_url in self._warned_base_urls:
+            return
+        self._warned_base_urls.add(base_url)
+        for warning in warnings:
+            self.ctx.logger.warning(f"MiMo Provider 安全提醒：{warning}（base_url={base_url}）")
+
     def _build_http_target(self, api_provider: Dict[str, Any]) -> Tuple[str, Dict[str, str], Dict[str, str]]:
         """构造请求 URL、Header 与查询参数。"""
 
         base_url = self._resolve_base_url(api_provider)
+        self._check_base_url(base_url)
         normalized_base = base_url.rstrip("/")
         if normalized_base.lower().endswith(CHAT_COMPLETIONS_PATH):
             url = normalized_base
@@ -925,6 +996,12 @@ class MiMoProviderPlugin(MaiBotPlugin):
             elif auth_type == "query":
                 query_name = str(api_provider.get("auth_query_name") or "api_key").strip() or "api_key"
                 params[query_name] = api_key
+                if not self._warned_query_auth:
+                    self._warned_query_auth = True
+                    self.ctx.logger.warning(
+                        "MiMo Provider 安全提醒：auth_type=query 会把 api_key 放进 URL 查询参数，"
+                        "可能被代理或访问日志记录；建议改用 bearer 或 header 鉴权。"
+                    )
 
         return url, headers, params
 
@@ -944,10 +1021,14 @@ class MiMoProviderPlugin(MaiBotPlugin):
         return DEFAULT_TIMEOUT_SECONDS
 
     def _get_http_client(self) -> httpx.AsyncClient:
-        """获取（惰性创建）共享的 HTTP 客户端。"""
+        """获取（惰性创建）共享的 HTTP 客户端。
+
+        明确关闭重定向跟随：跨域重定向时 httpx 会剥掉 Authorization，但附加 Header
+        与请求体（含聊天内容）仍会被发到重定向目标，存在泄露风险。
+        """
 
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(follow_redirects=True)
+            self._http_client = httpx.AsyncClient(follow_redirects=False)
         return self._http_client
 
     # ---- 状态展示 ----
